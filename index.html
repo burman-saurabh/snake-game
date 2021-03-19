@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Snake Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="statusDiv">
+        <div id="stageId">1</div>
+        <div id="scoreId">2</div>
+    </div>
+    <div id="boardId"></div>
+    <div id="gameOverId"></div>
+    <div id="replayId" onclick="window.location.reload()">Replay</div>
+    <div id="stageCompletedMsgId"></div>
+    <div id="nextStageButtonId" onclick="initiateNextStage()"></div>
+
+    <script>
+        let stageArray = new Array(); // contain all the stages in form of map data
+        let obstacleCellIds = new Array(); // stores all ids of the obstacle cells
+        let snakeHeadCellId; // contain id of snake head
+        let bodyCells = new Array(); // contains ids of the all body cells
+        let allCellsIdArray = new Array(); //contain ids of all the cells on the board
+        let randomCellToBite;
+        let stage = 0;
+        let score = 0;
+        let setSnakeRun;
+        let maxPointInAStage = 2;
+
+        document.getElementById('stageId').innerHTML = `Stage: ${stage}`;
+        document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+        let stageMap0 = new Map(); // stage 0
+        stageMap0.set(0, {
+            cellId: '1530',
+            width: 40,
+            height: 10
+        });
+        stageMap0.set(1, {
+            cellId: '5010',
+            width: 40,
+            height: 10
+        });
+        stageArray.push(stageMap0);
+
+        let stageMap1 = new Map(); // stage 1
+        stageMap1.set(0, {
+            cellId: '1525',
+            width: 20,
+            height: 10
+        });
+        stageMap1.set(1, {
+            cellId: '2550',
+            width: 5,
+            height: 20
+        });
+        stageMap1.set(2, {
+            cellId: '4540',
+            width: 5,
+            height: 20
+        });
+        stageArray.push(stageMap1);
+
+
+        function createBoard() {
+            let table = document.createElement('table');
+            table.setAttribute('id', 'table');
+            for (let i = 0; i < 80; i++) {
+                let row = table.insertRow(i);
+                for (let j = 0; j < 80; j++) {
+                    let cell = row.insertCell(j);
+                    if (i < 10 && j < 10) {
+                        cell.setAttribute('id', '0' + i + '0' + j);
+                    } else if (i < 10 && j >= 10) {
+                        cell.setAttribute('id', '0' + i + '' + j);
+                    } else if (i >= 10 && j < 10) {
+                        cell.setAttribute('id', i + '0' + j);
+                    } else if (i >= 10 && j >= 10) {
+                        cell.setAttribute('id', i + '' + j);
+                    }
+
+                    allCellsIdArray.push(cell.getAttribute('id'));
+                }
+            }
+
+            if (document.getElementById('boardId').childElementCount > 0) {
+                document.getElementById('boardId').replaceChild(table, document.getElementById('boardId')
+                    .firstElementChild)
+            } else {
+                document.getElementById('boardId').appendChild(table);
+            }
+
+            obstacleCellIds.splice(0, obstacleCellIds.length); //clear obstacleCellIds array
+
+        }
+
+        // creates obstacles based on the current stage the user is playing i.e. the nth map in the array
+        function createObstacles(stage) {
+            for (k = 0; k < stageArray[stage].size; k++) { // for each entries in the map stageArray[stage]
+                let cellId = stageArray[stage].get(k).cellId;
+                let row = Number(cellId.substr(0, 2));
+                let col = Number(cellId.substr(2));
+                for (let i = row; i < row + stageArray[stage].get(k).height; i++) {
+                    for (let j = col; j < col + stageArray[stage].get(k).width; j++) {
+                        if (i < 10 && j < 10) {
+                            if (document.getElementById('0' + i + '0' + j)) {
+                                document.getElementById('0' + i + '0' + j).classList.add('obstacles');
+                                obstacleCellIds.push('0' + i + '0' + j);
+                            }
+                        } else if (i < 10 && j >= 10) {
+                            if (document.getElementById('0' + i + '' + j)) {
+                                document.getElementById('0' + i + '' + j).classList.add('obstacles');
+                                obstacleCellIds.push('0' + i + '' + j);
+                            }
+                        } else if (i >= 10 && j < 10) {
+                            if (document.getElementById(i + '0' + j)) {
+                                document.getElementById(i + '0' + j).classList.add('obstacles');
+                                obstacleCellIds.push(i + '0' + j);
+                            }
+                        } else if (i >= 10 && j >= 10) {
+                            if (document.getElementById(i + '' + j)) {
+                                document.getElementById(i + '' + j).classList.add('obstacles');
+                                obstacleCellIds.push(i + '' + j);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function createSnake() {
+            snakeHeadCellId = generateSnakeHeadCellId();
+            console.log(snakeHeadCellId);
+            let headRow = Number(snakeHeadCellId.substr(0, 2));
+            let headCol = Number(snakeHeadCellId.substr(2));
+
+            document.getElementById(snakeHeadCellId.toString()).classList.add('head');
+            console.log(document.getElementById(snakeHeadCellId));
+
+            let directions = ['U', 'D', 'R', 'L'];
+            let randomDirection = directions[Math.floor(Math.random() * 4)];
+            console.log(randomDirection);
+
+            if (randomDirection == 'U') {
+                generateSnakeBodyForU(headRow, headCol);
+            } else if (randomDirection == 'D') {
+                generateSnakeBodyForD(headRow, headCol);
+            } else if (randomDirection == 'L') {
+                generateSnakeBodyForL(headRow, headCol);
+            } else if (randomDirection == 'R') {
+                generateSnakeBodyForR(headRow, headCol);
+            }
+
+            function generateSnakeBodyForU(headRow, headCol) {
+                for (let i = 1; i <= 45; i++) {
+                    let colId = headCol > 9 ? headCol.toString() : ('0' + headCol);
+                    let rowId;
+
+                    if (headRow + i > 79) {
+                        rowId = (i - (79 - headRow) - 1) > 9 ? (i - (79 - headRow) - 1) : ('0' + (i - (79 - headRow) -
+                            1));
+                    } else {
+                        rowId = (headRow + i) > 9 ? (headRow + i) : ('0' + (headRow + i));
+                    }
+
+                    let cellId = rowId + '' + colId;
+                    console.log(cellId);
+
+                    if (obstacleCellIds.indexOf(cellId) > 0 || bodyCells.length == 45) {
+                        break;
+                    } else {
+                        bodyCells.push(cellId);
+                        console.log(document.getElementById(cellId));
+                    }
+                }
+
+                if (bodyCells.length == 0) {
+                    generateSnakeBodyForL(headRow, headCol);
+                } else if (bodyCells.length > 0 && bodyCells.length < 45) {
+                    let rowId = Number(bodyCells[bodyCells.length - 1].substr(0, 2));
+                    let colId = Number(bodyCells[bodyCells.length - 1].substr(2));
+                    console.log(rowId, colId);
+                    generateSnakeBodyForL(rowId, colId);
+                }
+            }
+
+            function generateSnakeBodyForD(headRow, headCol) {
+                for (let i = 1; i <= 45; i++) {
+                    let colId = headCol > 9 ? headCol.toString() : ('0' + headCol);
+                    let rowId;
+
+                    if (headRow - i < 0) {
+                        rowId = (79 - (i - headRow - 1)) > 9 ? (79 - (i - headRow - 1)) : '0' + (79 - (i - headRow -
+                            1));
+                    } else {
+                        rowId = (headRow - i) > 9 ? (headRow - i) : ('0' + (headRow - i));
+                    }
+
+                    let cellId = rowId + '' + colId;
+
+                    if (obstacleCellIds.indexOf(cellId) > 0 || bodyCells.length == 45) {
+                        break;
+                    } else {
+                        bodyCells.push(cellId);
+                        console.log(document.getElementById(cellId));
+                    }
+                }
+
+                if (bodyCells.length == 0) {
+                    generateSnakeBodyForR(headRow, headCol);
+                } else if (bodyCells.length > 0 && bodyCells.length < 45) {
+                    let rowId = Number(bodyCells[bodyCells.length - 1].substr(0, 2));
+                    let colId = Number(bodyCells[bodyCells.length - 1].substr(2));
+                    console.log(rowId, colId);
+                    generateSnakeBodyForR(rowId, colId);
+                }
+
+            }
+
+            function generateSnakeBodyForL(headRow, headCol) {
+                for (let i = 1; i <= 45; i++) {
+                    let rowId = headRow > 9 ? headRow.toString() : ('0' + headRow);
+                    console.log(rowId);
+                    let colId;
+
+                    if (headCol + i > 79) {
+                        colId = (i - (79 - headCol) - 1) > 9 ? (i - (79 - headCol) - 1) : '0' + (i - (79 - headCol) -
+                            1);
+                    } else {
+                        colId = (headCol + i) > 9 ? (headCol + i) : ('0' + (headCol + i));
+                    }
+
+                    console.log(colId);
+
+                    let cellId = rowId + '' + colId;
+
+                    if (obstacleCellIds.indexOf(cellId) > 0 || bodyCells.length == 45) {
+                        break;
+                    } else {
+                        bodyCells.push(cellId);
+                        console.log(document.getElementById(cellId));
+                    }
+                }
+
+                if (bodyCells.length == 0) {
+                    generateSnakeBodyForD(headRow, headCol);
+                } else if (bodyCells.length > 0 && bodyCells.length < 45) {
+                    let rowId = Number(bodyCells[bodyCells.length - 1].substr(0, 2));
+                    let colId = Number(bodyCells[bodyCells.length - 1].substr(2));
+                    console.log(rowId, colId);
+                    generateSnakeBodyForD(rowId, colId);
+                }
+            }
+
+            function generateSnakeBodyForR(headRow, headCol) {
+                for (let i = 1; i <= 45; i++) {
+                    let rowId = headRow > 9 ? headRow.toString() : ('0' + headRow);
+                    let colId;
+
+                    if (headCol - i < 0) {
+                        colId = (79 - (i - headCol - 1)) > 9 ? (79 - (i - headCol - 1)) : '0' + (79 - (i - headCol -
+                            1));
+                    } else {
+                        colId = (headCol - i) > 9 ? (headCol - i) : ('0' + (headCol - i));
+                    }
+
+                    let cellId = rowId + '' + colId;
+
+                    if (obstacleCellIds.indexOf(cellId) > 0 || bodyCells.length == 45) {
+                        break;
+                    } else {
+                        bodyCells.push(cellId);
+                        console.log(document.getElementById(cellId));
+                    }
+                }
+
+                if (bodyCells.length == 0) {
+                    generateSnakeBodyForU(headRow, headCol);
+                } else if (bodyCells.length > 0 && bodyCells.length < 45) {
+                    let rowId = Number(bodyCells[bodyCells.length - 1].substr(0, 2));
+                    let colId = Number(bodyCells[bodyCells.length - 1].substr(2));
+                    console.log(rowId, colId);
+                    generateSnakeBodyForU(rowId, colId);
+                }
+            }
+
+            bodyCells.forEach((value, index) => {
+                // document.getElementById(value).classList.add(index);
+                document.getElementById(value).classList.add('body');
+            })
+
+        }
+
+        function generateSnakeHeadCellId() {
+            let i = Math.floor(Math.random() * 80);
+            let j = Math.floor(Math.random() * 80);
+            let snakeHeadCellId;
+            if (i < 10 && j < 10) {
+                snakeHeadCellId = '0' + i + '0' + j;
+            } else if (i < 10 && j >= 10) {
+                snakeHeadCellId = '0' + i + '' + j;
+            } else if (i >= 10 && j < 10) {
+                snakeHeadCellId = i + '0' + j;
+            } else if (i >= 10 && j >= 10) {
+                snakeHeadCellId = i + '' + j;
+            }
+
+            console.log(snakeHeadCellId);
+
+            if (obstacleCellIds.indexOf(snakeHeadCellId) > 0) {
+                snakeHeadCellId = generateSnakeHeadCellId();
+                return snakeHeadCellId;
+            } else {
+                return snakeHeadCellId;
+            }
+        }
+
+        let direction;
+
+        function getInitialDirection() {
+            let headRow = Number(snakeHeadCellId.substr(0, 2));
+            let headCol = Number(snakeHeadCellId.substr(2));
+
+            let firstBodyCellRow = Number(bodyCells[0].substr(0, 2));
+            let firstBodyCellCol = Number(bodyCells[0].substr(2));
+
+            if (headRow == firstBodyCellRow) {
+                if (headCol == firstBodyCellCol + 1) {
+                    direction = 'R';
+                } else if (headCol == firstBodyCellCol - 1) {
+                    direction = 'L';
+                } else if (headCol > firstBodyCellCol + 1) { //in case head passes over to the opp side
+                    direction = 'L';
+                } else if (headCol < firstBodyCellCol - 1) { //in case head passes over to the opp side
+                    direction = 'R';
+                }
+            }
+
+            if (headCol == firstBodyCellCol) {
+                if (headRow == firstBodyCellRow + 1) {
+                    direction = 'D';
+                } else if (headRow == firstBodyCellRow - 1) {
+                    direction = 'U';
+                } else if (headRow < firstBodyCellRow - 1) { //in case head passes over to the opp side
+                    direction = 'D';
+                } else if (headRow > firstBodyCellRow + 1) { //in case head passes over to the opp side
+                    direction = 'U';
+                }
+            }
+
+            console.log(direction);
+        }
+
+
+        createBoard();
+        createObstacles(stage);
+        createSnake();
+        getInitialDirection();
+        generateRandomCellToBite();
+        initiateRunInterval();
+
+        function initiateRunInterval() {
+            setSnakeRun = setInterval(() => {
+                runSnake();
+            }, 200);
+        }
+
+        function initiateNextStage() {
+            // clear obstacles, head and body
+            obstacleCellIds.splice(0, obstacleCellIds.length);
+            document.getElementById(snakeHeadCellId).classList.remove('head');
+            bodyCells.splice(0, bodyCells.length);
+
+            document.getElementById('stageCompletedMsgId').style.display = 'none';
+            document.getElementById('nextStageButtonId').style.display = 'none';
+            
+            // updating stage and score
+            score = 0;
+            stage++;
+            document.getElementById('stageId').innerHTML = `Stage: ${stage}`;
+            document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+            createBoard();
+            createObstacles(stage);
+            createSnake();
+            getInitialDirection();
+            generateRandomCellToBite();
+            initiateRunInterval();
+        }
+
+
+        function generateRandomCellToBite() {
+            let availableValidCells = allCellsIdArray.filter(item => !obstacleCellIds.includes(item)).filter(item => !
+                bodyCells.concat([snakeHeadCellId]).includes(item));
+
+            // console.log(availableValidCells);
+
+            randomCellToBite = availableValidCells[Math.floor(Math.random() * availableValidCells.length)];
+            document.getElementById(randomCellToBite).classList.add('randomCellToBite');
+        }
+
+        function runSnake() {
+            let headRow = Number(snakeHeadCellId.substr(0, 2));
+            let headCol = Number(snakeHeadCellId.substr(2));
+            let nextHeadCellId;
+
+            if (direction == 'D' && headRow != (document.getElementById('table').rows.length - 1)) {
+                nextHeadRow = (headRow + 1) > 9 ? (headRow + 1) : ('0' + (headRow + 1));
+                nextHeadCol = snakeHeadCellId.substr(2);
+
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Game Completed !!!';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+            
+            if (direction == 'D' && headRow == (document.getElementById('table').rows.length - 1)) {
+                nextHeadRow = '00';
+                nextHeadCol = snakeHeadCellId.substr(2);
+
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Game Completed !!!';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+
+            if (direction == 'U' && headRow != 0) {
+                nextHeadRow = (headRow - 1) > 9 ? (headRow - 1) : ('0' + (headRow - 1));
+                nextHeadCol = snakeHeadCellId.substr(2);
+
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Game Completed !!!';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+
+            if (direction == 'U' && headRow == 0) {
+                nextHeadRow = (document.getElementById('table').rows.length - 1).toString();
+                nextHeadCol = snakeHeadCellId.substr(2);
+
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Game Completed !!!';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+
+            if (direction == 'R' && headCol != (document.getElementById('table').rows[0].cells.length - 1)) {
+                nextHeadRow = snakeHeadCellId.substr(0, 2);
+                nextHeadCol = (headCol + 1) > 9 ? (headCol + 1) : ('0' + (headCol + 1));
+
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                // console.log(nextHeadCellId);
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Game Completed !!!';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+
+
+            if (direction == 'R' && headCol == (document.getElementById('table').rows[0].cells.length - 1)) {
+                nextHeadRow = snakeHeadCellId.substr(0, 2);
+                nextHeadCol = '00';
+
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                // console.log(nextHeadCellId);
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Game Completed !!!';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+
+            if (direction == 'L' && headCol != 0) {
+                nextHeadRow = snakeHeadCellId.substr(0, 2);
+                nextHeadCol = (headCol - 1) > 9 ? (headCol - 1) : ('0' + (headCol - 1));
+                
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                // console.log(nextHeadCellId);
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Game Completed !!!';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+
+
+            if (direction == 'L' && headCol == 0) {
+                nextHeadRow = snakeHeadCellId.substr(0, 2);
+                nextHeadCol = (document.getElementById('table').rows[0].cells.length - 1).toString();
+
+                nextHeadCellId = nextHeadRow + nextHeadCol;
+                // console.log(nextHeadCellId);
+                let canMove = checkNextHeadCellId(nextHeadCellId);
+
+                if (canMove == 'justMove') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(bodyCells[bodyCells.length - 1]).classList.remove('body');
+                    bodyCells.splice(bodyCells.length - 1);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    snakeHeadCellId = nextHeadCellId;
+
+                } else if (canMove == 'gotABite') {
+                    document.getElementById(snakeHeadCellId).classList.remove('head');
+                    document.getElementById(snakeHeadCellId).classList.add('body');
+                    bodyCells.unshift(snakeHeadCellId);
+
+                    document.getElementById(nextHeadCellId).classList.add('head');
+                    document.getElementById(nextHeadCellId).classList.remove('randomCellToBite');
+                    snakeHeadCellId = nextHeadCellId;
+
+                    score++;
+                    document.getElementById('scoreId').innerHTML = `Score: ${score}`;
+
+                    if (score < maxPointInAStage) {
+                        generateRandomCellToBite();
+                    } else if (score == maxPointInAStage && stage < stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('stageCompletedMsgId').style.display = 'block';
+                        document.getElementById('stageCompletedMsgId').innerHTML = 'Stage Completed!';
+                        document.getElementById('nextStageButtonId').style.display = 'block';
+                        document.getElementById('nextStageButtonId').innerHTML = 'Next';
+                    } else if (score == maxPointInAStage && stage == stageArray.length - 1) {
+                        clearInterval(setSnakeRun);
+                        document.getElementById('gameOverId').style.display = 'block';
+                        document.getElementById('gameOverId').innerHTML = 'Yayy...!! Game Completed';
+                    }
+
+                } else if (canMove == 'collided') {
+                    clearInterval(setSnakeRun);
+                    document.getElementById('replayId').style.display = 'block';
+                    document.getElementById('gameOverId').style.display = 'block';
+                    document.getElementById('gameOverId').innerHTML = 'Game Over !!!';
+                }
+
+            }
+
+
+
+
+        }
+
+        function checkNextHeadCellId(nextHeadCellId) {
+            if (obstacleCellIds.indexOf(nextHeadCellId) >= 0 || bodyCells.indexOf(nextHeadCellId) > 0) {
+                return 'collided';
+            } else if (nextHeadCellId == randomCellToBite) {
+                return 'gotABite';
+            } else {
+                return 'justMove';
+            }
+        }
+
+        document.onkeydown = function(e){
+            if(e.keyCode == 37){ 
+                direction = 'L';
+            }else if(e.keyCode == 38){
+                direction = 'U';
+            }else if(e.keyCode == 39){
+                direction = 'R';
+            }else if(e.keyCode == 40){
+                direction = 'D';
+            }
+        }
+        
+        //e.code:
+        // Letter keys have codes "Key<letter>": "KeyA", "KeyB" etc both for uppercase and lowercase letters.  e.key will be a,b,A,B etc
+        // Digit keys have codes: "Digit<number>": "Digit0", "Digit1" etc. e.key will be 1,2 etc
+        // Special keys are coded by their names: "Enter", "Backspace", "Tab" etc. e.key will be same as e.code
+
+    </script>
+
+
+</body>
+
+</html>

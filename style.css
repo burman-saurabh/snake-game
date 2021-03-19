@@ -1,0 +1,57 @@
+body{
+    background-color: bisque;
+}
+
+table, td, tr{
+    margin: auto;
+    border: 1px solid brown;
+    border-collapse: collapse;
+    background-color: burlywood
+}
+
+table{
+    margin-top: 10vh;
+}
+
+td{
+    height: 2px;
+    width: 2px;
+}
+
+.obstacles{
+    background-color: black;
+}
+
+.head{
+    background-color: black;
+}
+
+.body{
+    background-color: red;
+}
+
+.randomCellToBite{
+    background-color: red;
+}
+
+#statusDiv{
+    display: flex;
+    background-color: black;
+    padding: 1rem;
+    font-size: 2rem;
+    color: white;
+    justify-content: space-between;
+}
+
+#gameOverId, #replayId, #nextStageButtonId, #stageCompletedMsgId{
+    width: 50%;
+    margin: auto;
+    margin-top: 10px;
+    background-color: black;
+    padding: 2px;
+    font-size: 2rem;
+    color: white;
+    text-align: center;
+    cursor: pointer;
+    display: none;
+}
